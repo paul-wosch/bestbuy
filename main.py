@@ -30,9 +30,9 @@ class InvalidChoiceError(BaseException):
 
 class UserInputMustBeIntError(BaseException):
     """Raised when user input must be a whole number."""
-    def __init__(self, message="", input=""):
+    def __init__(self, message="", user_input=""):
         self.message = message
-        self.choice = input
+        self.choice = user_input
 
 
 class CancelDialog(BaseException):
@@ -57,7 +57,7 @@ def test():
 
 def do_nothing():
     """Dummy function."""
-    pass
+
 
 def not_implemented():
     """Another dummy function."""
@@ -127,9 +127,9 @@ def make_order(store):
             except UserInputMustBeIntError:
                 print(error_message_no_integer)
                 continue
-            except CancelDialog:
+            except CancelDialog as exc:
                 cleanup_on_cancel_order(shopping_cart)
-                raise CancelDialog
+                raise CancelDialog from exc
             if chosen_product_index == 0:
                 should_place_order = True
                 break
@@ -151,16 +151,15 @@ def make_order(store):
                 except UserInputMustBeIntError:
                     print(error_message_no_integer)
                     continue
-                except CancelDialog:
+                except CancelDialog as exc:
                     cleanup_on_cancel_order(shopping_cart)
-                    raise CancelDialog
+                    raise CancelDialog from exc
                 if chosen_product_qty <= chosen_product.available_qty:
                     shopping_cart.append((chosen_product, chosen_product_qty))
                     print(f"{chosen_product_qty} x '{chosen_product.name}' added to shopping cart.")
                     chosen_product.allocate(chosen_product_qty)
                     break
-                else:
-                    print("Quantity larger than available items in stock.")
+                print("Quantity larger than available items in stock.")
             wait_for_enter_key()
         # -----------------------------------------------------------------
         # Finally place the order
@@ -182,10 +181,10 @@ def buy(store, shopping_cart):
     if total:
         print(f"Order made! Total payment: ${total:,}")
     else:
-        print(f"There was a problem placing your order!")
+        print("There was a problem placing your order!")
 
 
-def quit():
+def say_goodbye():
     """Print 'Bye!'"""
     print("Bye!")
 
@@ -210,9 +209,9 @@ def ask_for_user_choice(prompt="Please choose a number: ",
 # ---------------------------------------------------------------------
 # FUNCTION DISPATCHER
 # ---------------------------------------------------------------------
-def create_dispatch_table(items: list[str], start=CLI_MENU_START_INDEX) -> dict:
+def create_dispatch_table(items: list[str], start_index=CLI_MENU_START_INDEX) -> dict:
     """Return a dynamically created dispatch table."""
-    return {start + i: item for i, item in enumerate(items)}
+    return {start_index + i: item for i, item in enumerate(items)}
 
 
 def dispatch(dispatch_table, choice: int | str):
@@ -279,8 +278,7 @@ def cli_input_listener(dispatch_table):
         if choice == 4:
             break
         wait_for_enter_key()
-    if choice:
-        return choice
+    return choice
 
 
 def start(store):
@@ -288,21 +286,19 @@ def start(store):
     dispatch_table = {1: (list_products, store),
                       2: (show_total_amount_of_store_items, store),
                       3: (make_order, store),
-                      4: quit
+                      4: say_goodbye
                       }
     cli_input_listener(dispatch_table)
 
 
 def choose_product():
     """Return the selected product from a list of products."""
-    pass
 
 
 def main():
     """Run the store."""
     best_buy = Store(product_list)
     start(best_buy)
-    # make_order(best_buy)
 
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ class Store:
 
     def get_total_quantity(self) -> int:
         """Return the total amount of items in the store."""
-        return sum([item.quantity for item in self.product_list])
+        return sum(item.quantity for item in self.product_list)
 
     def get_all_products(self) -> list[Product]:
         """Returns all products in the store with an active state."""
@@ -26,7 +26,7 @@ class Store:
 
     def order(self, shopping_list: list[tuple[Product, int]]) -> float:
         """Buy the given products and return total price for order."""
-        total_price = sum([Product.buy(item, count) for item, count in shopping_list])
+        total_price = sum(Product.buy(item, count) for item, count in shopping_list)
         return total_price
 
 
