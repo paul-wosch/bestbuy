@@ -127,6 +127,9 @@ def make_order(store):
             except UserInputMustBeIntError:
                 print(error_message_no_integer)
                 continue
+            except CancelDialog:
+                cleanup_on_cancel_order(shopping_cart)
+                raise CancelDialog
             if chosen_product_index == 0:
                 should_place_order = True
                 break
@@ -148,6 +151,9 @@ def make_order(store):
                 except UserInputMustBeIntError:
                     print(error_message_no_integer)
                     continue
+                except CancelDialog:
+                    cleanup_on_cancel_order(shopping_cart)
+                    raise CancelDialog
                 if chosen_product_qty <= chosen_product.available_qty:
                     shopping_cart.append((chosen_product, chosen_product_qty))
                     print(f"{chosen_product_qty} x '{chosen_product.name}' added to shopping cart.")
@@ -161,6 +167,12 @@ def make_order(store):
         if should_place_order:
             buy(store, shopping_cart)
             break
+
+
+def cleanup_on_cancel_order(shopping_cart):
+    """Reallocate availability for products in shopping card."""
+    for product, quantity in shopping_cart:
+        product.deallocate(quantity)
 
 
 def buy(store, shopping_cart):
