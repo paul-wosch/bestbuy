@@ -5,10 +5,11 @@ from store import Store
 
 CLI_MENU_ITEMS = ["List all products in store",
                   "Show total amount in store",
-                  "Make an order (not implemented)",
+                  "Make an order",
                   "Quit"
                   ]
 CLI_MENU_START_INDEX = 1
+HEADER_INDENT = 0
 
 # Initial stock of inventory
 product_list = [Product("MacBook Air M2", price=1450, quantity=100),
@@ -32,6 +33,18 @@ class UserInputMustBeIntError(BaseException):
     def __init__(self, message="", input=""):
         self.message = message
         self.choice = input
+
+
+class CancelDialog(BaseException):
+    """Raised when user cancels cli dialog."""
+    def __init__(self):
+        self.message = "Action cancelled. Going back to menu..."
+
+
+class NoProductsError(BaseException):
+    """Raised when there are no Products in store."""
+    def __init__(self):
+        self.message = "Currently no products in store. Come back later!"
 
 
 # ---------------------------------------------------------------------
@@ -65,11 +78,14 @@ def clear_screen():
 # CLI MENU COMMANDS
 # ---------------------------------------------------------------------
 def list_products(store):
-    """List available products."""
+    """Print products and return them as a list."""
     products = store.get_all_products()
+    if not products:
+        raise NoProductsError
     for i, product in enumerate(products):
         print(f"{i + CLI_MENU_START_INDEX:>3}. ", end="")
         product.show()
+    return products
 
 
 def show_total_amount_of_store_items(store):
@@ -78,9 +94,83 @@ def show_total_amount_of_store_items(store):
     print(f"Total of {item_count} items in store.")
 
 
-def make_order():
-    """Let the user make an oder."""
-    pass
+def make_order(store):
+    """Let the user make an order."""
+    shopping_cart = []
+    chosen_product = None
+    should_place_order = False
+    error_message_no_integer = "Choice must be a whole number or '..'!"
+    # -----------------------------------------------------------------
+    # Show the products menu
+    while True:
+        clear_screen()
+        print_title()
+        print_subtitle("Make order")
+        print()
+        if shopping_cart:
+            print(f"{'0':>3}. PLACE ORDER")
+        list_products(store)
+        # -----------------------------------------------------------------
+        # Create dispatch table
+        products = store.get_all_products()
+        dispatch_table = create_dispatch_table(products)
+        print()
+        # -----------------------------------------------------------------
+        # Prompt for product
+        while True:
+            prompt = "Select a product "
+            if shopping_cart:
+                prompt += "or 'PLACE ORDER' "
+            prompt += "(Enter '..' to cancel): "
+            try:
+                chosen_product_index = ask_for_user_choice(prompt, nested_call=True)
+            except UserInputMustBeIntError:
+                print(error_message_no_integer)
+                continue
+            if chosen_product_index == 0:
+                should_place_order = True
+                break
+            if not dispatch_table.get(chosen_product_index):
+                print("Please select one of the above products.")
+            else:
+                chosen_product = dispatch_table[chosen_product_index]
+                if chosen_product.available_qty == 0:
+                    print("Currently there are no items available for sale. Try again later.")
+                else:
+                    break
+        # -----------------------------------------------------------------
+        # Prompt for quantity
+        if not should_place_order:
+            while True:
+                prompt = "Enter the number of items you want to buy (Type '..' to cancel): "
+                try:
+                    chosen_product_qty = ask_for_user_choice(prompt, nested_call=True)
+                except UserInputMustBeIntError:
+                    print(error_message_no_integer)
+                    continue
+                if chosen_product_qty <= chosen_product.available_qty:
+                    shopping_cart.append((chosen_product, chosen_product_qty))
+                    print(f"{chosen_product_qty} x '{chosen_product.name}' added to shopping cart.")
+                    chosen_product.allocate(chosen_product_qty)
+                    break
+                else:
+                    print("Quantity larger than available items in stock.")
+            wait_for_enter_key()
+        # -----------------------------------------------------------------
+        # Finally place the order
+        if should_place_order:
+            buy(store, shopping_cart)
+            break
+
+
+def buy(store, shopping_cart):
+    """Finally place the order."""
+    print("Placing order...")
+    total = store.order(shopping_cart)
+    if total:
+        print(f"Order made! Total payment: ${total:,}")
+    else:
+        print(f"There was a problem placing your order!")
 
 
 def quit():
@@ -91,9 +181,13 @@ def quit():
 # ---------------------------------------------------------------------
 # INPUT PROMPTS
 # ---------------------------------------------------------------------
-def ask_for_user_choice(prompt="Please choose a number: ", accept_int_only=True):
+def ask_for_user_choice(prompt="Please choose a number: ",
+                        accept_int_only=True,
+                        nested_call=False):
     """Prompt the user to enter their choice and return this value."""
     choice = input(f"{prompt}").strip()
+    if nested_call and choice == "..":
+        raise CancelDialog()
     if accept_int_only and not choice.isdigit():
         raise UserInputMustBeIntError("Choice must be a whole number!", choice)
     if accept_int_only:
@@ -104,7 +198,7 @@ def ask_for_user_choice(prompt="Please choose a number: ", accept_int_only=True)
 # ---------------------------------------------------------------------
 # FUNCTION DISPATCHER
 # ---------------------------------------------------------------------
-def create_dispatch_table(items: list[str], start=CLI_MENU_START_INDEX):
+def create_dispatch_table(items: list[str], start=CLI_MENU_START_INDEX) -> dict:
     """Return a dynamically created dispatch table."""
     return {start + i: item for i, item in enumerate(items)}
 
@@ -126,25 +220,39 @@ def dispatch(dispatch_table, choice: int | str):
 # ---------------------------------------------------------------------
 # CLI MENU LOGIC
 # ---------------------------------------------------------------------
+def indent(n=HEADER_INDENT):
+    """Return whitespace characters for the given amount."""
+    return f"{' ' * n}"
+
+
+def print_title(title="BESTBYE STORE"):
+    """Print a title for the CLI."""
+    print(f"{indent()}{title}")
+    print(f"{indent()}-------------")
+
+
+def print_subtitle(subtitle):
+    """Print the given subtitle."""
+    print(f"{indent()}{subtitle}")
+
+
 def show_menu():
     """Display a CLI menu."""
-    print("   Store Menu")
-    print("   ----------")
     for i, menu_item in enumerate(CLI_MENU_ITEMS):
-        print(f"{CLI_MENU_START_INDEX + i}. {menu_item}")
+        print(f"{CLI_MENU_START_INDEX + i:>3}. {menu_item}")
     print()
 
 
-def start(store):
-    """Provide the main program flow."""
-    dispatch_table = {1: (list_products, store),
-                      2: (show_total_amount_of_store_items, store),
-                      3: not_implemented,
-                      4: quit
-                      }
+def cli_input_listener(dispatch_table):
+    """Listen for user input utilizing the provided dispatch table.
+
+    Return the user choice."""
     choice = None
     while True:
         clear_screen()
+        print_title()
+        print_subtitle("Main menu")
+        print()
         show_menu()
         try:
             choice = ask_for_user_choice()
@@ -152,9 +260,25 @@ def start(store):
             dispatch(dispatch_table, choice)
         except (InvalidChoiceError, UserInputMustBeIntError) as e:
             print(f"{e.message} - '{e.choice}'")
+        except NoProductsError as e:
+            print(f"{e.message}")
+        except CancelDialog as e:
+            print(f"{e.message}")
         if choice == 4:
             break
         wait_for_enter_key()
+    if choice:
+        return choice
+
+
+def start(store):
+    """Provide the main program flow."""
+    dispatch_table = {1: (list_products, store),
+                      2: (show_total_amount_of_store_items, store),
+                      3: (make_order, store),
+                      4: quit
+                      }
+    cli_input_listener(dispatch_table)
 
 
 def choose_product():
@@ -165,8 +289,8 @@ def choose_product():
 def main():
     """Run the store."""
     best_buy = Store(product_list)
-    # list_products(best_buy)
     start(best_buy)
+    # make_order(best_buy)
 
 
 if __name__ == "__main__":

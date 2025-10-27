@@ -35,6 +35,8 @@ class Product:
             self.active = True
         else:
             self.active = False
+        self.reserved_qty = 0
+        self.available_qty = self.quantity - self.reserved_qty
 
     def get_quantity(self) -> int:
         """Return total quantity of a product in stock."""
@@ -45,6 +47,30 @@ class Product:
         self.quantity = quantity
         if quantity == 0:
             self.deactivate()
+
+    def get_reserved_qty(self) -> int:
+        """Return item count of a product reserved in a shopping cart."""
+        return self.reserved_qty
+
+    def get_available_qty(self) -> int:
+        """Return item count of a product available for selling."""
+        return self.available_qty
+
+    def allocate(self, quantity):
+        """Allocate the given quantity of a product for selling
+        and update product Availability accordingly.
+        """
+        self.reserved_qty += quantity
+        self.update_availability()
+
+    def deallocate(self, quantity):
+        """Clear the given quantity of a product from allocation."""
+        self.reserved_qty -= quantity
+        self.update_availability()
+
+    def update_availability(self):
+        """Recalculate product Availability."""
+        self.available_qty = self.quantity - self.reserved_qty
 
     def is_active(self) -> bool:
         """Return True if a product is active, otherwise False."""
@@ -69,14 +95,17 @@ class Product:
         product_str = (f"{self.name}, "
                        f"Price: {self.price}, "
                        f"Quantity: {self.quantity}, "
+                       f"Reserved: {self.reserved_qty}, "
+                       f"Available: {self.available_qty}, "
                        f"Status: {status}")
         print(product_str)
 
     def buy(self, quantity) -> float:
         """Buy the given quantity of a product.
 
-        Return the purchase's total price
-        and update the product quantity in stock.
+        - Return the purchase's total price.
+        - Update the product quantity in stock.
+        - Deallocate reserved quantity.
 
         Raise exception if product is out of stock for the given quantity.
         """
@@ -84,6 +113,7 @@ class Product:
             raise ProductOutOfStockError(f"Product '{self.name}' "
                                          f"is out of stock or deactivated")
         self.set_quantity(self.quantity - quantity)
+        self.deallocate(quantity)
         return self.price * quantity
 
 
